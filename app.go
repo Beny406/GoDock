@@ -88,8 +88,8 @@ func (a *App) TrackMouse() {
 			_, height := robotgo.GetScreenSize()
 			x, y := robotgo.Location()
 			// Define the middle of the screen (e.g., between 1/3 and 2/3 of the screen height)
-			middleMin := height / 3
-			middleMax := 2 * height / 3
+			middleMin := height / 4
+			middleMax := 3 * height / 4
 
 			// Show the dock when the mouse is within the middle of the Y-axis
 			if x <= 5 && y >= middleMin && y <= middleMax {
@@ -102,7 +102,10 @@ func (a *App) TrackMouse() {
 }
 
 func (a *App) WindowHide() {
-	runtime.WindowHide(a.ctx)
+	x, _ := robotgo.Location()
+	if x > 5 {
+		runtime.WindowHide(a.ctx)
+	}
 }
 
 var previousId string
@@ -190,7 +193,7 @@ func (a *App) StartTicker() {
 func (a *App) setSizeAndPosition() {
 	apps := a.GetDesktopFiles()
 	_, height := robotgo.GetScreenSize()
-	runtime.WindowSetPosition(a.ctx, -5, height/2-(len(apps)*40))
+	runtime.WindowSetPosition(a.ctx, 0, height/2-(len(apps)*40))
 	runtime.WindowSetSize(a.ctx, 85, len(apps)*74)
 }
 
