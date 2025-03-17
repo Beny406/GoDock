@@ -14,4 +14,4 @@ clean:
 
 # Run the application (useful for production testing)
 run:
-	./build/GoDockElm
+	./build/bin/GoDockElm

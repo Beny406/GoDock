@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,6 +50,17 @@ func (a *App) GetDesktopFiles() []DesktopFile {
 
 	// Get .desktop files from /usr/share/applications
 	desktopFiles, _ := filepath.Glob("/home/petr/GoDock/*.desktop")
+	sort.Slice(desktopFiles, func(i, j int) bool {
+		filename1 := filepath.Base(desktopFiles[i]) // "7_xpad.desktop"
+		filename2 := filepath.Base(desktopFiles[j]) // "7_xpad.desktop"
+
+		// Split by underscore to get the number part
+
+		int1, _ := strconv.Atoi(strings.Split(filename1, "_")[0])
+		int2, _ := strconv.Atoi(strings.Split(filename2, "_")[0])
+
+		return int1 < int2
+	})
 
 	for _, file := range desktopFiles {
 		name, icon, exec, wmClass := parseDesktopFile(file)
