@@ -1,0 +1,13 @@
+{
+  "name": "GoDockElm",
+  "outputfilename": "GoDockElm",
+  "frontend:install": "",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev:watch",
+  "wailsjsdir": "./frontend",
+  "assetdir": "./frontend",
+  "author": {
+    "name": "petr",
+    "email": "beny406@seznam.cz"
+  }
+}
