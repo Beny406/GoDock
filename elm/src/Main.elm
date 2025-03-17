@@ -37,16 +37,28 @@ type alias Flags =
 type alias AppInfoFromFlags =
     { iconPath : String
     , name : String
-    , runningIds : Maybe (List String)
+    , instances : Maybe (List WmInstance)
     , execPath : String
     , wmClass : String
+    }
+
+
+type alias WmCtrlApp =
+    { wmClass : String
+    , instances : List WmInstance
+    }
+
+
+type alias WmInstance =
+    { name : String
+    , windowId : String
     }
 
 
 type alias AppInfo =
     { iconPath : String
     , name : String
-    , runningIds : Maybe (List String)
+    , instances : Maybe (List WmInstance)
     , execPath : String
     , wmClass : String
     , justClicked : Maybe String
@@ -67,7 +79,7 @@ init { apps } =
                     (\flagApp ->
                         { iconPath = flagApp.iconPath
                         , name = flagApp.name
-                        , runningIds = flagApp.runningIds
+                        , instances = flagApp.instances
                         , execPath = flagApp.execPath
                         , wmClass = flagApp.wmClass
                         , justClicked = Nothing
@@ -86,7 +98,7 @@ init { apps } =
 type Msg
     = IconClicked AppInfo (Maybe String)
     | BouncingRunOut AppInfo
-    | RunningAppsReceived (List ( String, List String ))
+    | RunningAppsReceived (List WmCtrlApp)
     | ClassMouseLeave String
     | ClassMouseEnter String
     | AppMouseLeave
@@ -105,20 +117,20 @@ update msg model =
             { model | desktopApps = List.updateIf (\app_ -> app.name == app_.name) (always app) model.desktopApps }
                 |> Return.singleton
 
-        RunningAppsReceived newRunningAps ->
+        RunningAppsReceived newRunningCtrlApps ->
             { model
                 | desktopApps =
                     model.desktopApps
                         |> List.map
                             (\app ->
                                 let
-                                    newRunningIds : Maybe (List String)
+                                    newRunningIds : Maybe (List WmInstance)
                                     newRunningIds =
-                                        newRunningAps
-                                            |> List.find (\( wmClass, _ ) -> wmClass == app.wmClass)
-                                            |> Maybe.map Tuple.second
+                                        newRunningCtrlApps
+                                            |> List.find (\newApp -> newApp.wmClass == app.wmClass)
+                                            |> Maybe.map .instances
                                 in
-                                { app | runningIds = newRunningIds }
+                                { app | instances = newRunningIds }
                             )
             }
                 |> Return.singleton
@@ -167,7 +179,7 @@ view model =
                             , HE.onMouseEnter (ClassMouseEnter app.wmClass)
                             , HE.onMouseLeave (ClassMouseLeave app.wmClass)
                             ]
-                            [ case app.runningIds of
+                            [ case app.instances of
                                 Nothing ->
                                     H.div
                                         [ HE.onClick (IconClicked { app | justClicked = Just "" } Nothing)
@@ -186,24 +198,24 @@ view model =
                                             []
                                         ]
 
-                                Just runningIds ->
+                                Just instances ->
                                     (if model.hoveredClass == Just app.wmClass then
-                                        runningIds
+                                        instances
 
                                      else
-                                        runningIds |> List.take 1
+                                        instances |> List.take 1
                                     )
-                                        |> (\runningIds_ ->
+                                        |> (\instances_ ->
                                                 flexRow [ HA.css [ Css.justifyContent Css.center, Css.marginRight (Css.px 16) ] ]
-                                                    (runningIds_
+                                                    (instances_
                                                         |> List.map
-                                                            (\runningId ->
+                                                            (\instance ->
                                                                 H.div
-                                                                    [ HE.onClick (IconClicked { app | justClicked = Just runningId } (Just runningId))
+                                                                    [ HE.onClick (IconClicked { app | justClicked = Just instance.windowId } (Just instance.windowId))
                                                                     , HA.classList
                                                                         [ ( "icon-container", True )
                                                                         , ( "running", True )
-                                                                        , ( "bounce", app.justClicked == Just runningId )
+                                                                        , ( "bounce", app.justClicked == Just instance.windowId )
                                                                         ]
                                                                     ]
                                                                     [ H.img
@@ -211,7 +223,7 @@ view model =
                                                                         , HA.width 64
                                                                         , HA.height 64
                                                                         , HA.src app.iconPath
-                                                                        , HA.title app.name
+                                                                        , HA.title instance.name
                                                                         ]
                                                                         []
                                                                     ]
@@ -260,4 +272,4 @@ port mouseAppLeft : () -> Cmd msg
 port iconClicked : ( Maybe String, String ) -> Cmd msg
 
 
-port runningAppsReceived : (List ( String, List String ) -> msg) -> Sub msg
+port runningAppsReceived : (List WmCtrlApp -> msg) -> Sub msg

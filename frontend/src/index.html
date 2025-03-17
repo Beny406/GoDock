@@ -32,9 +32,7 @@
             });
 
             window.runtime.EventsOnMultiple('update', (data) => {
-                const result = Object.entries(data).map(([key, value]) => [key, value]);
-                console.log(result)
-                app.ports.runningAppsReceived.send(result);
+                app.ports.runningAppsReceived.send(data);
             }, -1);
         });
 

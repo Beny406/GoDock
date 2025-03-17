@@ -19,12 +19,22 @@ type App struct {
 	ticker *time.Ticker
 }
 
-type AppInfo struct {
-	Name       string   `json:"name"`
-	IconPath   string   `json:"iconPath"`
-	RunningIds []string `json:"runningIds"`
-	ExecPath   string   `json:"execPath"`
-	WmClass    string   `json:"wmClass"`
+type DesktopFile struct {
+	Name      string           `json:"name"`
+	IconPath  string           `json:"iconPath"`
+	Instances []WmCtrlInstance `json:"instances"`
+	ExecPath  string           `json:"execPath"`
+	WmClass   string           `json:"wmClass"`
+}
+
+type WmCtrlApp struct {
+	WmClass   string           `json:"wmClass"`
+	Instances []WmCtrlInstance `json:"instances"`
+}
+
+type WmCtrlInstance struct {
+	WindowId string `json:"windowId"`
+	Name     string `json:"name"`
 }
 
 // NewApp creates a new App application struct
@@ -32,17 +42,17 @@ func NewApp() *App {
 	return &App{}
 }
 
-func (a *App) GetDesktopFiles() []AppInfo {
-	runningApps := a.getRunningApps()
-	apps := []AppInfo{}
+func (a *App) GetDesktopFiles() []DesktopFile {
+	classToInstancesMap := a.getRunningInstances()
+	apps := []DesktopFile{}
 
 	// Get .desktop files from /usr/share/applications
 	desktopFiles, _ := filepath.Glob("/home/petr/GoDock/*.desktop")
 
 	for _, file := range desktopFiles {
 		name, icon, exec, wmClass := parseDesktopFile(file)
-		runningId, _ := runningApps[strings.ToLower(name)]
-		apps = append(apps, AppInfo{Name: name, IconPath: icon, RunningIds: runningId, ExecPath: exec, WmClass: wmClass})
+		instances, _ := classToInstancesMap[strings.ToLower(name)]
+		apps = append(apps, DesktopFile{Name: name, IconPath: icon, Instances: instances, ExecPath: exec, WmClass: wmClass})
 	}
 
 	return apps
@@ -115,7 +125,7 @@ func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 	return err
 }
 
-func (a *App) getRunningApps() map[string][]string {
+func (a *App) getRunningInstances() map[string][]WmCtrlInstance {
 	// Run the wmctrl command to list windows
 	cmd := exec.Command("wmctrl", "-lx")
 	output, err := cmd.Output()
@@ -125,7 +135,7 @@ func (a *App) getRunningApps() map[string][]string {
 
 	// Parse the output into application names
 	lines := strings.Split(string(output), "\n")
-	apps := make(map[string][]string)
+	apps := make(map[string][]WmCtrlInstance)
 
 	for _, line := range lines {
 		parts := strings.Fields(line)
@@ -143,7 +153,11 @@ func (a *App) getRunningApps() map[string][]string {
 		windowID := parts[0]
 
 		// Append the window ID to the list of window IDs for this app class
-		apps[appClass] = append(apps[appClass], windowID)
+		instance := WmCtrlInstance{
+			WindowId: windowID,
+			Name:     strings.Join(parts[4:], " "),
+		}
+		apps[appClass] = append(apps[appClass], instance)
 	}
 
 	return apps
@@ -157,7 +171,17 @@ func (a *App) StartTicker() {
 	go func() {
 		// Periodically send updates to the frontend
 		for range ticker.C {
-			runtime.EventsEmit(a.ctx, "update", a.getRunningApps())
+			var apps []WmCtrlApp
+			for wmClass, instances := range a.getRunningInstances() {
+				apps = append(apps,
+					WmCtrlApp{
+						WmClass:   wmClass,
+						Instances: instances,
+					})
+
+			}
+
+			runtime.EventsEmit(a.ctx, "update", apps)
 		}
 	}()
 

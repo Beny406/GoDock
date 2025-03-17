@@ -5197,7 +5197,7 @@ var $author$project$Main$init = function (_v0) {
 			desktopApps: A2(
 				$elm$core$List$map,
 				function (flagApp) {
-					return {execPath: flagApp.execPath, iconPath: flagApp.iconPath, justClicked: $elm$core$Maybe$Nothing, name: flagApp.name, runningIds: flagApp.runningIds, wmClass: flagApp.wmClass};
+					return {execPath: flagApp.execPath, iconPath: flagApp.iconPath, instances: flagApp.instances, justClicked: $elm$core$Maybe$Nothing, name: flagApp.name, wmClass: flagApp.wmClass};
 				},
 				apps),
 			hoveredClass: $elm$core$Maybe$Nothing
@@ -5211,25 +5211,36 @@ var $elm$json$Json$Decode$string = _Json_decodeString;
 var $author$project$Main$RunningAppsReceived = function (a) {
 	return {$: 'RunningAppsReceived', a: a};
 };
-var $elm$json$Json$Decode$index = _Json_decodeIndex;
 var $author$project$Main$runningAppsReceived = _Platform_incomingPort(
 	'runningAppsReceived',
 	$elm$json$Json$Decode$list(
 		A2(
 			$elm$json$Json$Decode$andThen,
-			function (_v0) {
+			function (wmClass) {
 				return A2(
 					$elm$json$Json$Decode$andThen,
-					function (_v1) {
+					function (instances) {
 						return $elm$json$Json$Decode$succeed(
-							_Utils_Tuple2(_v0, _v1));
+							{instances: instances, wmClass: wmClass});
 					},
 					A2(
-						$elm$json$Json$Decode$index,
-						1,
-						$elm$json$Json$Decode$list($elm$json$Json$Decode$string)));
+						$elm$json$Json$Decode$field,
+						'instances',
+						$elm$json$Json$Decode$list(
+							A2(
+								$elm$json$Json$Decode$andThen,
+								function (windowId) {
+									return A2(
+										$elm$json$Json$Decode$andThen,
+										function (name) {
+											return $elm$json$Json$Decode$succeed(
+												{name: name, windowId: windowId});
+										},
+										A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string));
+								},
+								A2($elm$json$Json$Decode$field, 'windowId', $elm$json$Json$Decode$string)))));
 			},
-			A2($elm$json$Json$Decode$index, 0, $elm$json$Json$Decode$string))));
+			A2($elm$json$Json$Decode$field, 'wmClass', $elm$json$Json$Decode$string))));
 var $author$project$Main$subscriptions = function (_v0) {
 	return $author$project$Main$runningAppsReceived($author$project$Main$RunningAppsReceived);
 };
@@ -6258,10 +6269,6 @@ var $author$project$Shared$Return$Extra$pushMsgWithTimeout = F3(
 					$elm$core$Process$sleep(delay))),
 			ret);
 	});
-var $elm$core$Tuple$second = function (_v0) {
-	var y = _v0.b;
-	return y;
-};
 var $Fresheyeball$elm_return$Return$singleton = function (a) {
 	return _Utils_Tuple2(a, $elm$core$Platform$Cmd$none);
 };
@@ -6318,7 +6325,7 @@ var $author$project$Main$update = F2(
 								model.desktopApps)
 						}));
 			case 'RunningAppsReceived':
-				var newRunningAps = msg.a;
+				var newRunningCtrlApps = msg.a;
 				return $Fresheyeball$elm_return$Return$singleton(
 					_Utils_update(
 						model,
@@ -6328,17 +6335,18 @@ var $author$project$Main$update = F2(
 								function (app) {
 									var newRunningIds = A2(
 										$elm$core$Maybe$map,
-										$elm$core$Tuple$second,
+										function ($) {
+											return $.instances;
+										},
 										A2(
 											$elm_community$list_extra$List$Extra$find,
-											function (_v1) {
-												var wmClass = _v1.a;
-												return _Utils_eq(wmClass, app.wmClass);
+											function (newApp) {
+												return _Utils_eq(newApp.wmClass, app.wmClass);
 											},
-											newRunningAps));
+											newRunningCtrlApps));
 									return _Utils_update(
 										app,
-										{runningIds: newRunningIds});
+										{instances: newRunningIds});
 								},
 								model.desktopApps)
 						}));
@@ -6571,6 +6579,10 @@ var $rtfeldman$elm_css$Css$String$mapJoin = F3(
 	function (map, sep, strs) {
 		return A4($rtfeldman$elm_css$Css$String$mapJoinHelp, map, sep, strs, '');
 	});
+var $elm$core$Tuple$second = function (_v0) {
+	var y = _v0.b;
+	return y;
+};
 var $rtfeldman$elm_css$Html$Styled$Attributes$classList = function (classes) {
 	return $rtfeldman$elm_css$Html$Styled$Attributes$class(
 		A3(
@@ -8220,7 +8232,7 @@ var $author$project$Main$view = function (model) {
 							_List_fromArray(
 								[
 									function () {
-									var _v0 = app.runningIds;
+									var _v0 = app.instances;
 									if (_v0.$ === 'Nothing') {
 										return A2(
 											$rtfeldman$elm_css$Html$Styled$div,
@@ -8259,8 +8271,8 @@ var $author$project$Main$view = function (model) {
 													_List_Nil)
 												]));
 									} else {
-										var runningIds = _v0.a;
-										return function (runningIds_) {
+										var instances = _v0.a;
+										return function (instances_) {
 											return A2(
 												$author$project$Main$flexRow,
 												_List_fromArray(
@@ -8275,7 +8287,7 @@ var $author$project$Main$view = function (model) {
 													]),
 												A2(
 													$elm$core$List$map,
-													function (runningId) {
+													function (instance) {
 														return A2(
 															$rtfeldman$elm_css$Html$Styled$div,
 															_List_fromArray(
@@ -8286,9 +8298,9 @@ var $author$project$Main$view = function (model) {
 																		_Utils_update(
 																			app,
 																			{
-																				justClicked: $elm$core$Maybe$Just(runningId)
+																				justClicked: $elm$core$Maybe$Just(instance.windowId)
 																			}),
-																		$elm$core$Maybe$Just(runningId))),
+																		$elm$core$Maybe$Just(instance.windowId))),
 																	$rtfeldman$elm_css$Html$Styled$Attributes$classList(
 																	_List_fromArray(
 																		[
@@ -8298,7 +8310,7 @@ var $author$project$Main$view = function (model) {
 																			'bounce',
 																			_Utils_eq(
 																				app.justClicked,
-																				$elm$core$Maybe$Just(runningId)))
+																				$elm$core$Maybe$Just(instance.windowId)))
 																		]))
 																]),
 															_List_fromArray(
@@ -8311,16 +8323,16 @@ var $author$project$Main$view = function (model) {
 																			$rtfeldman$elm_css$Html$Styled$Attributes$width(64),
 																			$rtfeldman$elm_css$Html$Styled$Attributes$height(64),
 																			$rtfeldman$elm_css$Html$Styled$Attributes$src(app.iconPath),
-																			$rtfeldman$elm_css$Html$Styled$Attributes$title(app.name)
+																			$rtfeldman$elm_css$Html$Styled$Attributes$title(instance.name)
 																		]),
 																	_List_Nil)
 																]));
 													},
-													runningIds_));
+													instances_));
 										}(
 											_Utils_eq(
 												model.hoveredClass,
-												$elm$core$Maybe$Just(app.wmClass)) ? runningIds : A2($elm$core$List$take, 1, runningIds));
+												$elm$core$Maybe$Just(app.wmClass)) ? instances : A2($elm$core$List$take, 1, instances));
 									}
 								}()
 								]));
@@ -8351,10 +8363,10 @@ _Platform_export({'Main':{'init':$author$project$Main$main(
 					function (wmClass) {
 						return A2(
 							$elm$json$Json$Decode$andThen,
-							function (runningIds) {
+							function (name) {
 								return A2(
 									$elm$json$Json$Decode$andThen,
-									function (name) {
+									function (instances) {
 										return A2(
 											$elm$json$Json$Decode$andThen,
 											function (iconPath) {
@@ -8362,25 +8374,37 @@ _Platform_export({'Main':{'init':$author$project$Main$main(
 													$elm$json$Json$Decode$andThen,
 													function (execPath) {
 														return $elm$json$Json$Decode$succeed(
-															{execPath: execPath, iconPath: iconPath, name: name, runningIds: runningIds, wmClass: wmClass});
+															{execPath: execPath, iconPath: iconPath, instances: instances, name: name, wmClass: wmClass});
 													},
 													A2($elm$json$Json$Decode$field, 'execPath', $elm$json$Json$Decode$string));
 											},
 											A2($elm$json$Json$Decode$field, 'iconPath', $elm$json$Json$Decode$string));
 									},
-									A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string));
+									A2(
+										$elm$json$Json$Decode$field,
+										'instances',
+										$elm$json$Json$Decode$oneOf(
+											_List_fromArray(
+												[
+													$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
+													A2(
+													$elm$json$Json$Decode$map,
+													$elm$core$Maybe$Just,
+													$elm$json$Json$Decode$list(
+														A2(
+															$elm$json$Json$Decode$andThen,
+															function (windowId) {
+																return A2(
+																	$elm$json$Json$Decode$andThen,
+																	function (name) {
+																		return $elm$json$Json$Decode$succeed(
+																			{name: name, windowId: windowId});
+																	},
+																	A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string));
+															},
+															A2($elm$json$Json$Decode$field, 'windowId', $elm$json$Json$Decode$string))))
+												]))));
 							},
-							A2(
-								$elm$json$Json$Decode$field,
-								'runningIds',
-								$elm$json$Json$Decode$oneOf(
-									_List_fromArray(
-										[
-											$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
-											A2(
-											$elm$json$Json$Decode$map,
-											$elm$core$Maybe$Just,
-											$elm$json$Json$Decode$list($elm$json$Json$Decode$string))
-										]))));
+							A2($elm$json$Json$Decode$field, 'name', $elm$json$Json$Decode$string));
 					},
 					A2($elm$json$Json$Decode$field, 'wmClass', $elm$json$Json$Decode$string))))))(0)}});}(this));
