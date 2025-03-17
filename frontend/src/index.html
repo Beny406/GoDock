@@ -20,6 +20,11 @@
         window.go.main.App.GetDesktopFiles().then(apps => {
             const app = Elm.Main.init({node: document.getElementById("elm"), flags: {apps: apps}});
 
+            app.ports.mouseAppLeft.subscribe(function (params) {
+                window.go.main.App.WindowHide()
+                    .then(result => console.log(result));
+            });
+
             app.ports.iconClicked.subscribe(function (params) {
                 const [runningId, execPath] = params;
                 window.go.main.App.BringToFrontOrLaunch(runningId, execPath)
@@ -27,7 +32,9 @@
             });
 
             window.runtime.EventsOnMultiple('update', (data) => {
-                app.ports.runningAppsReceived.send(data);
+                const result = Object.entries(data).map(([key, value]) => [key, value]);
+                console.log(result)
+                app.ports.runningAppsReceived.send(result);
             }, -1);
         });
 

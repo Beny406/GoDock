@@ -5194,12 +5194,13 @@ var $author$project$Main$init = function (_v0) {
 	var apps = _v0.apps;
 	return _Utils_Tuple2(
 		{
-			apps: A2(
+			desktopApps: A2(
 				$elm$core$List$map,
 				function (flagApp) {
-					return {execPath: flagApp.execPath, iconPath: flagApp.iconPath, justClicked: false, name: flagApp.name, runningId: flagApp.runningId, wmClass: flagApp.wmClass};
+					return {execPath: flagApp.execPath, iconPath: flagApp.iconPath, justClicked: $elm$core$Maybe$Nothing, name: flagApp.name, runningIds: flagApp.runningIds, wmClass: flagApp.wmClass};
 				},
-				apps)
+				apps),
+			hoveredClass: $elm$core$Maybe$Nothing
 		},
 		$elm$core$Platform$Cmd$none);
 };
@@ -5223,7 +5224,10 @@ var $author$project$Main$runningAppsReceived = _Platform_incomingPort(
 						return $elm$json$Json$Decode$succeed(
 							_Utils_Tuple2(_v0, _v1));
 					},
-					A2($elm$json$Json$Decode$index, 1, $elm$json$Json$Decode$string));
+					A2(
+						$elm$json$Json$Decode$index,
+						1,
+						$elm$json$Json$Decode$list($elm$json$Json$Decode$string)));
 			},
 			A2($elm$json$Json$Decode$index, 0, $elm$json$Json$Decode$string))));
 var $author$project$Main$subscriptions = function (_v0) {
@@ -6233,6 +6237,11 @@ var $elm$core$Maybe$map = F2(
 			return $elm$core$Maybe$Nothing;
 		}
 	});
+var $author$project$Main$mouseAppLeft = _Platform_outgoingPort(
+	'mouseAppLeft',
+	function ($) {
+		return $elm$json$Json$Encode$null;
+	});
 var $elm$core$Process$sleep = _Process_sleep;
 var $author$project$Shared$Return$Extra$pushMsgWithTimeout = F3(
 	function (delay, msg, ret) {
@@ -6270,28 +6279,29 @@ var $author$project$Main$update = F2(
 		switch (msg.$) {
 			case 'IconClicked':
 				var app = msg.a;
+				var maybeId = msg.b;
 				return A3(
 					$author$project$Shared$Return$Extra$pushMsgWithTimeout,
 					500,
 					$author$project$Main$BouncingRunOut(
 						_Utils_update(
 							app,
-							{justClicked: false})),
+							{justClicked: $elm$core$Maybe$Nothing})),
 					A2(
 						$Fresheyeball$elm_return$Return$command,
 						$author$project$Main$iconClicked(
-							_Utils_Tuple2(app.runningId, app.execPath)),
+							_Utils_Tuple2(maybeId, app.execPath)),
 						$Fresheyeball$elm_return$Return$singleton(
 							_Utils_update(
 								model,
 								{
-									apps: A3(
+									desktopApps: A3(
 										$elm_community$list_extra$List$Extra$updateIf,
 										function (app_) {
 											return _Utils_eq(app.name, app_.name);
 										},
 										$elm$core$Basics$always(app),
-										model.apps)
+										model.desktopApps)
 								}))));
 			case 'BouncingRunOut':
 				var app = msg.a;
@@ -6299,24 +6309,24 @@ var $author$project$Main$update = F2(
 					_Utils_update(
 						model,
 						{
-							apps: A3(
+							desktopApps: A3(
 								$elm_community$list_extra$List$Extra$updateIf,
 								function (app_) {
 									return _Utils_eq(app.name, app_.name);
 								},
 								$elm$core$Basics$always(app),
-								model.apps)
+								model.desktopApps)
 						}));
-			default:
-				var runningApps = msg.a;
+			case 'RunningAppsReceived':
+				var newRunningAps = msg.a;
 				return $Fresheyeball$elm_return$Return$singleton(
 					_Utils_update(
 						model,
 						{
-							apps: A2(
+							desktopApps: A2(
 								$elm$core$List$map,
 								function (app) {
-									var newRunningId = A2(
+									var newRunningIds = A2(
 										$elm$core$Maybe$map,
 										$elm$core$Tuple$second,
 										A2(
@@ -6325,18 +6335,181 @@ var $author$project$Main$update = F2(
 												var wmClass = _v1.a;
 												return _Utils_eq(wmClass, app.wmClass);
 											},
-											runningApps));
+											newRunningAps));
 									return _Utils_update(
 										app,
-										{runningId: newRunningId});
+										{runningIds: newRunningIds});
 								},
-								model.apps)
+								model.desktopApps)
 						}));
+			case 'ClassMouseLeave':
+				var string = msg.a;
+				return _Utils_eq(
+					model.hoveredClass,
+					$elm$core$Maybe$Just(string)) ? $Fresheyeball$elm_return$Return$singleton(
+					_Utils_update(
+						model,
+						{hoveredClass: $elm$core$Maybe$Nothing})) : $Fresheyeball$elm_return$Return$singleton(model);
+			case 'ClassMouseEnter':
+				var string = msg.a;
+				return $Fresheyeball$elm_return$Return$singleton(
+					_Utils_update(
+						model,
+						{
+							hoveredClass: $elm$core$Maybe$Just(string)
+						}));
+			default:
+				return A2(
+					$Fresheyeball$elm_return$Return$command,
+					$author$project$Main$mouseAppLeft(_Utils_Tuple0),
+					$Fresheyeball$elm_return$Return$singleton(model));
 		}
 	});
-var $author$project$Main$IconClicked = function (a) {
-	return {$: 'IconClicked', a: a};
+var $author$project$Main$AppMouseLeave = {$: 'AppMouseLeave'};
+var $author$project$Main$ClassMouseEnter = function (a) {
+	return {$: 'ClassMouseEnter', a: a};
 };
+var $author$project$Main$ClassMouseLeave = function (a) {
+	return {$: 'ClassMouseLeave', a: a};
+};
+var $author$project$Main$IconClicked = F2(
+	function (a, b) {
+		return {$: 'IconClicked', a: a, b: b};
+	});
+var $rtfeldman$elm_css$Css$Preprocess$ApplyStyles = function (a) {
+	return {$: 'ApplyStyles', a: a};
+};
+var $elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(x);
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $rtfeldman$elm_css$Css$Preprocess$AppendProperty = function (a) {
+	return {$: 'AppendProperty', a: a};
+};
+var $rtfeldman$elm_css$Css$Structure$Property = function (a) {
+	return {$: 'Property', a: a};
+};
+var $rtfeldman$elm_css$Css$Internal$property = F2(
+	function (key, value) {
+		return $rtfeldman$elm_css$Css$Preprocess$AppendProperty(
+			$rtfeldman$elm_css$Css$Structure$Property(key + (':' + value)));
+	});
+var $elm$core$Maybe$withDefault = F2(
+	function (_default, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return value;
+		} else {
+			return _default;
+		}
+	});
+var $rtfeldman$elm_css$Css$Internal$getOverloadedProperty = F3(
+	function (functionName, desiredKey, style) {
+		getOverloadedProperty:
+		while (true) {
+			switch (style.$) {
+				case 'AppendProperty':
+					var str = style.a.a;
+					var key = A2(
+						$elm$core$Maybe$withDefault,
+						'',
+						$elm$core$List$head(
+							A2($elm$core$String$split, ':', str)));
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, key);
+				case 'ExtendSelector':
+					var selector = style.a;
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-selector'));
+				case 'NestSnippet':
+					var combinator = style.a;
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-combinator'));
+				case 'WithPseudoElement':
+					var pseudoElement = style.a;
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-pseudo-element setter'));
+				case 'WithMedia':
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-media-query'));
+				case 'WithKeyframes':
+					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-keyframes'));
+				default:
+					if (!style.a.b) {
+						return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-empty-Style'));
+					} else {
+						if (!style.a.b.b) {
+							var _v1 = style.a;
+							var only = _v1.a;
+							var $temp$functionName = functionName,
+								$temp$desiredKey = desiredKey,
+								$temp$style = only;
+							functionName = $temp$functionName;
+							desiredKey = $temp$desiredKey;
+							style = $temp$style;
+							continue getOverloadedProperty;
+						} else {
+							var _v2 = style.a;
+							var first = _v2.a;
+							var rest = _v2.b;
+							var $temp$functionName = functionName,
+								$temp$desiredKey = desiredKey,
+								$temp$style = $rtfeldman$elm_css$Css$Preprocess$ApplyStyles(rest);
+							functionName = $temp$functionName;
+							desiredKey = $temp$desiredKey;
+							style = $temp$style;
+							continue getOverloadedProperty;
+						}
+					}
+			}
+		}
+	});
+var $rtfeldman$elm_css$Css$Internal$IncompatibleUnits = {$: 'IncompatibleUnits'};
+var $rtfeldman$elm_css$Css$Structure$Compatible = {$: 'Compatible'};
+var $elm$core$String$fromFloat = _String_fromNumber;
+var $rtfeldman$elm_css$Css$Internal$lengthConverter = F3(
+	function (units, unitLabel, numericValue) {
+		return {
+			absoluteLength: $rtfeldman$elm_css$Css$Structure$Compatible,
+			calc: $rtfeldman$elm_css$Css$Structure$Compatible,
+			flexBasis: $rtfeldman$elm_css$Css$Structure$Compatible,
+			fontSize: $rtfeldman$elm_css$Css$Structure$Compatible,
+			length: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrAutoOrCoverOrContain: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrNone: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrNoneOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrNumber: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lengthOrNumberOrAutoOrNoneOrContent: $rtfeldman$elm_css$Css$Structure$Compatible,
+			lineHeight: $rtfeldman$elm_css$Css$Structure$Compatible,
+			numericValue: numericValue,
+			textIndent: $rtfeldman$elm_css$Css$Structure$Compatible,
+			unitLabel: unitLabel,
+			units: units,
+			value: _Utils_ap(
+				$elm$core$String$fromFloat(numericValue),
+				unitLabel)
+		};
+	});
+var $rtfeldman$elm_css$Css$Internal$lengthForOverloadedProperty = A3($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$Internal$IncompatibleUnits, '', 0);
+var $rtfeldman$elm_css$Css$alignItems = function (fn) {
+	return A3(
+		$rtfeldman$elm_css$Css$Internal$getOverloadedProperty,
+		'alignItems',
+		'align-items',
+		fn($rtfeldman$elm_css$Css$Internal$lengthForOverloadedProperty));
+};
+var $rtfeldman$elm_css$Css$property = F2(
+	function (key, value) {
+		return $rtfeldman$elm_css$Css$Preprocess$AppendProperty(
+			$rtfeldman$elm_css$Css$Structure$Property(key + (':' + value)));
+	});
+var $rtfeldman$elm_css$Css$prop1 = F2(
+	function (key, arg) {
+		return A2($rtfeldman$elm_css$Css$property, key, arg.value);
+	});
+var $rtfeldman$elm_css$Css$center = $rtfeldman$elm_css$Css$prop1('center');
 var $rtfeldman$elm_css$VirtualDom$Styled$Attribute = F3(
 	function (a, b, c) {
 		return {$: 'Attribute', a: a, b: b, c: c};
@@ -6564,15 +6737,6 @@ var $rtfeldman$elm_css$Css$Structure$compactStylesheet = function (_v0) {
 		namespaces: namespaces
 	};
 };
-var $elm$core$Maybe$withDefault = F2(
-	function (_default, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return value;
-		} else {
-			return _default;
-		}
-	});
 var $rtfeldman$elm_css$Css$Structure$Output$charsetToString = function (charset) {
 	return A2(
 		$elm$core$Maybe$withDefault,
@@ -6798,9 +6962,6 @@ var $rtfeldman$elm_css$Css$Structure$FontFace = function (a) {
 };
 var $rtfeldman$elm_css$Css$Structure$PageRule = function (a) {
 	return {$: 'PageRule', a: a};
-};
-var $rtfeldman$elm_css$Css$Structure$Property = function (a) {
-	return {$: 'Property', a: a};
 };
 var $rtfeldman$elm_css$Css$Structure$Selector = F3(
 	function (a, b, c) {
@@ -7175,15 +7336,6 @@ var $rtfeldman$elm_css$Css$Structure$concatMapLastStyleBlock = F2(
 			first,
 			A2($rtfeldman$elm_css$Css$Structure$concatMapLastStyleBlock, update, rest));
 	});
-var $elm$core$List$head = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(x);
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
 var $rtfeldman$elm_css$Css$Preprocess$Resolve$last = function (list) {
 	last:
 	while (true) {
@@ -7896,24 +8048,11 @@ var $rtfeldman$elm_css$VirtualDom$Styled$Node = F3(
 var $rtfeldman$elm_css$VirtualDom$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$Node;
 var $rtfeldman$elm_css$Html$Styled$node = $rtfeldman$elm_css$VirtualDom$Styled$node;
 var $rtfeldman$elm_css$Html$Styled$div = $rtfeldman$elm_css$Html$Styled$node('div');
-var $rtfeldman$elm_css$Css$Structure$Compatible = {$: 'Compatible'};
 var $rtfeldman$elm_css$Css$row = {flexDirection: $rtfeldman$elm_css$Css$Structure$Compatible, flexDirectionOrWrap: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'row'};
 var $rtfeldman$elm_css$Css$column = _Utils_update(
 	$rtfeldman$elm_css$Css$row,
 	{value: 'column'});
-var $rtfeldman$elm_css$Css$Preprocess$AppendProperty = function (a) {
-	return {$: 'AppendProperty', a: a};
-};
-var $rtfeldman$elm_css$Css$property = F2(
-	function (key, value) {
-		return $rtfeldman$elm_css$Css$Preprocess$AppendProperty(
-			$rtfeldman$elm_css$Css$Structure$Property(key + (':' + value)));
-	});
 var $rtfeldman$elm_css$Css$displayFlex = A2($rtfeldman$elm_css$Css$property, 'display', 'flex');
-var $rtfeldman$elm_css$Css$prop1 = F2(
-	function (key, arg) {
-		return A2($rtfeldman$elm_css$Css$property, key, arg.value);
-	});
 var $rtfeldman$elm_css$Css$flexDirection = $rtfeldman$elm_css$Css$prop1('flex-direction');
 var $rtfeldman$elm_css$Html$Styled$styled = F4(
 	function (fn, styles, attrs, children) {
@@ -7932,6 +8071,19 @@ var $author$project$Main$flexColumn = A2(
 		[
 			$rtfeldman$elm_css$Css$displayFlex,
 			$rtfeldman$elm_css$Css$flexDirection($rtfeldman$elm_css$Css$column)
+		]));
+var $rtfeldman$elm_css$Css$minWidth = $rtfeldman$elm_css$Css$prop1('min-width');
+var $rtfeldman$elm_css$Css$PxUnits = {$: 'PxUnits'};
+var $rtfeldman$elm_css$Css$px = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$PxUnits, 'px');
+var $author$project$Main$flexRow = A2(
+	$rtfeldman$elm_css$Html$Styled$styled,
+	$rtfeldman$elm_css$Html$Styled$div,
+	_List_fromArray(
+		[
+			$rtfeldman$elm_css$Css$displayFlex,
+			$rtfeldman$elm_css$Css$flexDirection($rtfeldman$elm_css$Css$row),
+			$rtfeldman$elm_css$Css$minWidth(
+			$rtfeldman$elm_css$Css$px(0))
 		]));
 var $rtfeldman$elm_css$VirtualDom$Styled$attribute = F2(
 	function (key, value) {
@@ -7956,98 +8108,6 @@ var $elm_community$maybe_extra$Maybe$Extra$isJust = function (m) {
 		return true;
 	}
 };
-var $rtfeldman$elm_css$Css$Preprocess$ApplyStyles = function (a) {
-	return {$: 'ApplyStyles', a: a};
-};
-var $rtfeldman$elm_css$Css$Internal$property = F2(
-	function (key, value) {
-		return $rtfeldman$elm_css$Css$Preprocess$AppendProperty(
-			$rtfeldman$elm_css$Css$Structure$Property(key + (':' + value)));
-	});
-var $rtfeldman$elm_css$Css$Internal$getOverloadedProperty = F3(
-	function (functionName, desiredKey, style) {
-		getOverloadedProperty:
-		while (true) {
-			switch (style.$) {
-				case 'AppendProperty':
-					var str = style.a.a;
-					var key = A2(
-						$elm$core$Maybe$withDefault,
-						'',
-						$elm$core$List$head(
-							A2($elm$core$String$split, ':', str)));
-					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, key);
-				case 'ExtendSelector':
-					var selector = style.a;
-					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-selector'));
-				case 'NestSnippet':
-					var combinator = style.a;
-					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-combinator'));
-				case 'WithPseudoElement':
-					var pseudoElement = style.a;
-					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-pseudo-element setter'));
-				case 'WithMedia':
-					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-media-query'));
-				case 'WithKeyframes':
-					return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-inapplicable-Style-for-keyframes'));
-				default:
-					if (!style.a.b) {
-						return A2($rtfeldman$elm_css$Css$Internal$property, desiredKey, 'elm-css-error-cannot-apply-' + (functionName + '-with-empty-Style'));
-					} else {
-						if (!style.a.b.b) {
-							var _v1 = style.a;
-							var only = _v1.a;
-							var $temp$functionName = functionName,
-								$temp$desiredKey = desiredKey,
-								$temp$style = only;
-							functionName = $temp$functionName;
-							desiredKey = $temp$desiredKey;
-							style = $temp$style;
-							continue getOverloadedProperty;
-						} else {
-							var _v2 = style.a;
-							var first = _v2.a;
-							var rest = _v2.b;
-							var $temp$functionName = functionName,
-								$temp$desiredKey = desiredKey,
-								$temp$style = $rtfeldman$elm_css$Css$Preprocess$ApplyStyles(rest);
-							functionName = $temp$functionName;
-							desiredKey = $temp$desiredKey;
-							style = $temp$style;
-							continue getOverloadedProperty;
-						}
-					}
-			}
-		}
-	});
-var $rtfeldman$elm_css$Css$Internal$IncompatibleUnits = {$: 'IncompatibleUnits'};
-var $elm$core$String$fromFloat = _String_fromNumber;
-var $rtfeldman$elm_css$Css$Internal$lengthConverter = F3(
-	function (units, unitLabel, numericValue) {
-		return {
-			absoluteLength: $rtfeldman$elm_css$Css$Structure$Compatible,
-			calc: $rtfeldman$elm_css$Css$Structure$Compatible,
-			flexBasis: $rtfeldman$elm_css$Css$Structure$Compatible,
-			fontSize: $rtfeldman$elm_css$Css$Structure$Compatible,
-			length: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrAutoOrCoverOrContain: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrNone: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrNoneOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrNumber: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lengthOrNumberOrAutoOrNoneOrContent: $rtfeldman$elm_css$Css$Structure$Compatible,
-			lineHeight: $rtfeldman$elm_css$Css$Structure$Compatible,
-			numericValue: numericValue,
-			textIndent: $rtfeldman$elm_css$Css$Structure$Compatible,
-			unitLabel: unitLabel,
-			units: units,
-			value: _Utils_ap(
-				$elm$core$String$fromFloat(numericValue),
-				unitLabel)
-		};
-	});
-var $rtfeldman$elm_css$Css$Internal$lengthForOverloadedProperty = A3($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$Internal$IncompatibleUnits, '', 0);
 var $rtfeldman$elm_css$Css$justifyContent = function (fn) {
 	return A3(
 		$rtfeldman$elm_css$Css$Internal$getOverloadedProperty,
@@ -8055,6 +8115,12 @@ var $rtfeldman$elm_css$Css$justifyContent = function (fn) {
 		'justify-content',
 		fn($rtfeldman$elm_css$Css$Internal$lengthForOverloadedProperty));
 };
+var $rtfeldman$elm_css$Css$marginRight = $rtfeldman$elm_css$Css$prop1('margin-right');
+var $rtfeldman$elm_css$Css$maxWidth = $rtfeldman$elm_css$Css$prop1('max-width');
+var $rtfeldman$elm_css$Css$fillAvailable = {lengthOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrNoneOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible, minMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible, value: 'fill-available'};
+var $rtfeldman$elm_css$Css$minContent = _Utils_update(
+	$rtfeldman$elm_css$Css$fillAvailable,
+	{value: 'min-content'});
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
 	return {$: 'Normal', a: a};
 };
@@ -8080,17 +8146,28 @@ var $rtfeldman$elm_css$Html$Styled$Events$onClick = function (msg) {
 		'click',
 		$elm$json$Json$Decode$succeed(msg));
 };
+var $rtfeldman$elm_css$Html$Styled$Events$onMouseEnter = function (msg) {
+	return A2(
+		$rtfeldman$elm_css$Html$Styled$Events$on,
+		'mouseenter',
+		$elm$json$Json$Decode$succeed(msg));
+};
+var $rtfeldman$elm_css$Html$Styled$Events$onMouseLeave = function (msg) {
+	return A2(
+		$rtfeldman$elm_css$Html$Styled$Events$on,
+		'mouseleave',
+		$elm$json$Json$Decode$succeed(msg));
+};
 var $rtfeldman$elm_css$Css$prop2 = F3(
 	function (key, argA, argB) {
 		return A2($rtfeldman$elm_css$Css$property, key, argA.value + (' ' + argB.value));
 	});
 var $rtfeldman$elm_css$Css$padding2 = $rtfeldman$elm_css$Css$prop2('padding');
-var $rtfeldman$elm_css$Css$PxUnits = {$: 'PxUnits'};
-var $rtfeldman$elm_css$Css$px = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, $rtfeldman$elm_css$Css$PxUnits, 'px');
 var $rtfeldman$elm_css$Css$spaceBetween = $rtfeldman$elm_css$Css$prop1('space-between');
 var $rtfeldman$elm_css$Html$Styled$Attributes$src = function (url) {
 	return A2($rtfeldman$elm_css$Html$Styled$Attributes$stringProperty, 'src', url);
 };
+var $rtfeldman$elm_css$Css$start = $rtfeldman$elm_css$Css$prop1('start');
 var $rtfeldman$elm_css$Html$Styled$Attributes$title = $rtfeldman$elm_css$Html$Styled$Attributes$stringProperty('title');
 var $rtfeldman$elm_css$Html$Styled$Attributes$width = function (n) {
 	return A2(
@@ -8098,6 +8175,8 @@ var $rtfeldman$elm_css$Html$Styled$Attributes$width = function (n) {
 		'width',
 		$elm$core$String$fromInt(n));
 };
+var $rtfeldman$elm_css$Css$UnitlessInteger = {$: 'UnitlessInteger'};
+var $rtfeldman$elm_css$Css$zero = {length: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrAuto: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrAutoOrCoverOrContain: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrNone: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrNoneOrMinMaxDimension: $rtfeldman$elm_css$Css$Structure$Compatible, lengthOrNumber: $rtfeldman$elm_css$Css$Structure$Compatible, number: $rtfeldman$elm_css$Css$Structure$Compatible, numericValue: 0, outline: $rtfeldman$elm_css$Css$Structure$Compatible, unitLabel: '', units: $rtfeldman$elm_css$Css$UnitlessInteger, value: '0'};
 var $author$project$Main$view = function (model) {
 	return A2(
 		$rtfeldman$elm_css$Html$Styled$div,
@@ -8115,11 +8194,15 @@ var $author$project$Main$view = function (model) {
 						_List_fromArray(
 							[
 								$rtfeldman$elm_css$Css$justifyContent($rtfeldman$elm_css$Css$spaceBetween),
+								$rtfeldman$elm_css$Css$alignItems($rtfeldman$elm_css$Css$start),
 								A2(
 								$rtfeldman$elm_css$Css$padding2,
 								$rtfeldman$elm_css$Css$px(8),
-								$rtfeldman$elm_css$Css$px(4))
-							]))
+								$rtfeldman$elm_css$Css$px(4)),
+								$rtfeldman$elm_css$Css$minWidth($rtfeldman$elm_css$Css$zero),
+								$rtfeldman$elm_css$Css$maxWidth($rtfeldman$elm_css$Css$minContent)
+							])),
+						$rtfeldman$elm_css$Html$Styled$Events$onMouseLeave($author$project$Main$AppMouseLeave)
 					]),
 				A2(
 					$elm$core$List$map,
@@ -8128,37 +8211,121 @@ var $author$project$Main$view = function (model) {
 							$rtfeldman$elm_css$Html$Styled$div,
 							_List_fromArray(
 								[
-									$rtfeldman$elm_css$Html$Styled$Events$onClick(
-									$author$project$Main$IconClicked(
-										_Utils_update(
-											app,
-											{justClicked: true}))),
-									$rtfeldman$elm_css$Html$Styled$Attributes$classList(
-									_List_fromArray(
-										[
-											_Utils_Tuple2('icon-container', true),
-											_Utils_Tuple2(
-											'running',
-											$elm_community$maybe_extra$Maybe$Extra$isJust(app.runningId)),
-											_Utils_Tuple2('bounce', app.justClicked)
-										]))
+									$rtfeldman$elm_css$Html$Styled$Attributes$id(app.wmClass),
+									$rtfeldman$elm_css$Html$Styled$Events$onMouseEnter(
+									$author$project$Main$ClassMouseEnter(app.wmClass)),
+									$rtfeldman$elm_css$Html$Styled$Events$onMouseLeave(
+									$author$project$Main$ClassMouseLeave(app.wmClass))
 								]),
 							_List_fromArray(
 								[
-									A2(
-									$rtfeldman$elm_css$Html$Styled$img,
-									_List_fromArray(
-										[
-											$rtfeldman$elm_css$Html$Styled$Attributes$class('icon'),
-											$rtfeldman$elm_css$Html$Styled$Attributes$width(64),
-											$rtfeldman$elm_css$Html$Styled$Attributes$height(64),
-											$rtfeldman$elm_css$Html$Styled$Attributes$src(app.iconPath),
-											$rtfeldman$elm_css$Html$Styled$Attributes$title(app.name)
-										]),
-									_List_Nil)
+									function () {
+									var _v0 = app.runningIds;
+									if (_v0.$ === 'Nothing') {
+										return A2(
+											$rtfeldman$elm_css$Html$Styled$div,
+											_List_fromArray(
+												[
+													$rtfeldman$elm_css$Html$Styled$Events$onClick(
+													A2(
+														$author$project$Main$IconClicked,
+														_Utils_update(
+															app,
+															{
+																justClicked: $elm$core$Maybe$Just('')
+															}),
+														$elm$core$Maybe$Nothing)),
+													$rtfeldman$elm_css$Html$Styled$Attributes$classList(
+													_List_fromArray(
+														[
+															_Utils_Tuple2('icon-container', true),
+															_Utils_Tuple2(
+															'bounce',
+															$elm_community$maybe_extra$Maybe$Extra$isJust(app.justClicked))
+														]))
+												]),
+											_List_fromArray(
+												[
+													A2(
+													$rtfeldman$elm_css$Html$Styled$img,
+													_List_fromArray(
+														[
+															$rtfeldman$elm_css$Html$Styled$Attributes$class('icon'),
+															$rtfeldman$elm_css$Html$Styled$Attributes$width(64),
+															$rtfeldman$elm_css$Html$Styled$Attributes$height(64),
+															$rtfeldman$elm_css$Html$Styled$Attributes$src(app.iconPath),
+															$rtfeldman$elm_css$Html$Styled$Attributes$title(app.name)
+														]),
+													_List_Nil)
+												]));
+									} else {
+										var runningIds = _v0.a;
+										return function (runningIds_) {
+											return A2(
+												$author$project$Main$flexRow,
+												_List_fromArray(
+													[
+														$rtfeldman$elm_css$Html$Styled$Attributes$css(
+														_List_fromArray(
+															[
+																$rtfeldman$elm_css$Css$justifyContent($rtfeldman$elm_css$Css$center),
+																$rtfeldman$elm_css$Css$marginRight(
+																$rtfeldman$elm_css$Css$px(16))
+															]))
+													]),
+												A2(
+													$elm$core$List$map,
+													function (runningId) {
+														return A2(
+															$rtfeldman$elm_css$Html$Styled$div,
+															_List_fromArray(
+																[
+																	$rtfeldman$elm_css$Html$Styled$Events$onClick(
+																	A2(
+																		$author$project$Main$IconClicked,
+																		_Utils_update(
+																			app,
+																			{
+																				justClicked: $elm$core$Maybe$Just(runningId)
+																			}),
+																		$elm$core$Maybe$Just(runningId))),
+																	$rtfeldman$elm_css$Html$Styled$Attributes$classList(
+																	_List_fromArray(
+																		[
+																			_Utils_Tuple2('icon-container', true),
+																			_Utils_Tuple2('running', true),
+																			_Utils_Tuple2(
+																			'bounce',
+																			_Utils_eq(
+																				app.justClicked,
+																				$elm$core$Maybe$Just(runningId)))
+																		]))
+																]),
+															_List_fromArray(
+																[
+																	A2(
+																	$rtfeldman$elm_css$Html$Styled$img,
+																	_List_fromArray(
+																		[
+																			$rtfeldman$elm_css$Html$Styled$Attributes$class('icon'),
+																			$rtfeldman$elm_css$Html$Styled$Attributes$width(64),
+																			$rtfeldman$elm_css$Html$Styled$Attributes$height(64),
+																			$rtfeldman$elm_css$Html$Styled$Attributes$src(app.iconPath),
+																			$rtfeldman$elm_css$Html$Styled$Attributes$title(app.name)
+																		]),
+																	_List_Nil)
+																]));
+													},
+													runningIds_));
+										}(
+											_Utils_eq(
+												model.hoveredClass,
+												$elm$core$Maybe$Just(app.wmClass)) ? runningIds : A2($elm$core$List$take, 1, runningIds));
+									}
+								}()
 								]));
 					},
-					model.apps))
+					model.desktopApps))
 			]));
 };
 var $author$project$Main$main = $elm$browser$Browser$element(
@@ -8184,7 +8351,7 @@ _Platform_export({'Main':{'init':$author$project$Main$main(
 					function (wmClass) {
 						return A2(
 							$elm$json$Json$Decode$andThen,
-							function (runningId) {
+							function (runningIds) {
 								return A2(
 									$elm$json$Json$Decode$andThen,
 									function (name) {
@@ -8195,7 +8362,7 @@ _Platform_export({'Main':{'init':$author$project$Main$main(
 													$elm$json$Json$Decode$andThen,
 													function (execPath) {
 														return $elm$json$Json$Decode$succeed(
-															{execPath: execPath, iconPath: iconPath, name: name, runningId: runningId, wmClass: wmClass});
+															{execPath: execPath, iconPath: iconPath, name: name, runningIds: runningIds, wmClass: wmClass});
 													},
 													A2($elm$json$Json$Decode$field, 'execPath', $elm$json$Json$Decode$string));
 											},
@@ -8205,12 +8372,15 @@ _Platform_export({'Main':{'init':$author$project$Main$main(
 							},
 							A2(
 								$elm$json$Json$Decode$field,
-								'runningId',
+								'runningIds',
 								$elm$json$Json$Decode$oneOf(
 									_List_fromArray(
 										[
 											$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
-											A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, $elm$json$Json$Decode$string)
+											A2(
+											$elm$json$Json$Decode$map,
+											$elm$core$Maybe$Just,
+											$elm$json$Json$Decode$list($elm$json$Json$Decode$string))
 										]))));
 					},
 					A2($elm$json$Json$Decode$field, 'wmClass', $elm$json$Json$Decode$string))))))(0)}});}(this));

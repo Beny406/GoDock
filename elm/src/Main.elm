@@ -37,7 +37,7 @@ type alias Flags =
 type alias AppInfoFromFlags =
     { iconPath : String
     , name : String
-    , runningId : Maybe String
+    , runningIds : Maybe (List String)
     , execPath : String
     , wmClass : String
     }
@@ -46,32 +46,34 @@ type alias AppInfoFromFlags =
 type alias AppInfo =
     { iconPath : String
     , name : String
-    , runningId : Maybe String
+    , runningIds : Maybe (List String)
     , execPath : String
     , wmClass : String
-    , justClicked : Bool
+    , justClicked : Maybe String
     }
 
 
 type alias Model =
-    { apps : List AppInfo
+    { desktopApps : List AppInfo
+    , hoveredClass : Maybe String
     }
 
 
 init : Flags -> ( Model, Cmd msg )
 init { apps } =
-    ( { apps =
+    ( { desktopApps =
             apps
                 |> List.map
                     (\flagApp ->
                         { iconPath = flagApp.iconPath
                         , name = flagApp.name
-                        , runningId = flagApp.runningId
+                        , runningIds = flagApp.runningIds
                         , execPath = flagApp.execPath
                         , wmClass = flagApp.wmClass
-                        , justClicked = False
+                        , justClicked = Nothing
                         }
                     )
+      , hoveredClass = Nothing
       }
     , Cmd.none
     )
@@ -82,41 +84,62 @@ init { apps } =
 
 
 type Msg
-    = IconClicked AppInfo
+    = IconClicked AppInfo (Maybe String)
     | BouncingRunOut AppInfo
-    | RunningAppsReceived (List ( String, String ))
+    | RunningAppsReceived (List ( String, List String ))
+    | ClassMouseLeave String
+    | ClassMouseEnter String
+    | AppMouseLeave
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        IconClicked app ->
-            { model | apps = List.updateIf (\app_ -> app.name == app_.name) (always app) model.apps }
+        IconClicked app maybeId ->
+            { model | desktopApps = List.updateIf (\app_ -> app.name == app_.name) (always app) model.desktopApps }
                 |> Return.singleton
-                |> Return.command (iconClicked ( app.runningId, app.execPath ))
-                |> Return.pushMsgWithTimeout 500 (BouncingRunOut { app | justClicked = False })
+                |> Return.command (iconClicked ( maybeId, app.execPath ))
+                |> Return.pushMsgWithTimeout 500 (BouncingRunOut { app | justClicked = Nothing })
 
         BouncingRunOut app ->
-            { model | apps = List.updateIf (\app_ -> app.name == app_.name) (always app) model.apps }
+            { model | desktopApps = List.updateIf (\app_ -> app.name == app_.name) (always app) model.desktopApps }
                 |> Return.singleton
 
-        RunningAppsReceived runningApps ->
+        RunningAppsReceived newRunningAps ->
             { model
-                | apps =
-                    model.apps
+                | desktopApps =
+                    model.desktopApps
                         |> List.map
                             (\app ->
                                 let
-                                    newRunningId : Maybe String
-                                    newRunningId =
-                                        runningApps
+                                    newRunningIds : Maybe (List String)
+                                    newRunningIds =
+                                        newRunningAps
                                             |> List.find (\( wmClass, _ ) -> wmClass == app.wmClass)
                                             |> Maybe.map Tuple.second
                                 in
-                                { app | runningId = newRunningId }
+                                { app | runningIds = newRunningIds }
                             )
             }
                 |> Return.singleton
+
+        ClassMouseLeave string ->
+            if model.hoveredClass == Just string then
+                { model | hoveredClass = Nothing }
+                    |> Return.singleton
+
+            else
+                model
+                    |> Return.singleton
+
+        ClassMouseEnter string ->
+            { model | hoveredClass = Just string }
+                |> Return.singleton
+
+        AppMouseLeave ->
+            model
+                |> Return.singleton
+                |> Return.command (mouseAppLeft ())
 
 
 
@@ -126,26 +149,75 @@ update msg model =
 view : Model -> H.Html Msg
 view model =
     H.div [ HA.id "app" ]
-        [ flexColumn [ HA.css [ Css.justifyContent Css.spaceBetween, Css.padding2 (Css.px 8) (Css.px 4) ] ]
-            (model.apps
+        [ flexColumn
+            [ HA.css
+                [ Css.justifyContent Css.spaceBetween
+                , Css.alignItems Css.start
+                , Css.padding2 (Css.px 8) (Css.px 4)
+                , Css.minWidth Css.zero
+                , Css.maxWidth Css.minContent
+                ]
+            , HE.onMouseLeave AppMouseLeave
+            ]
+            (model.desktopApps
                 |> List.map
                     (\app ->
                         H.div
-                            [ HE.onClick (IconClicked { app | justClicked = True })
-                            , HA.classList
-                                [ ( "icon-container", True )
-                                , ( "running", Maybe.isJust app.runningId )
-                                , ( "bounce", app.justClicked )
-                                ]
+                            [ HA.id app.wmClass
+                            , HE.onMouseEnter (ClassMouseEnter app.wmClass)
+                            , HE.onMouseLeave (ClassMouseLeave app.wmClass)
                             ]
-                            [ H.img
-                                [ HA.class "icon"
-                                , HA.width 64
-                                , HA.height 64
-                                , HA.src app.iconPath
-                                , HA.title app.name
-                                ]
-                                []
+                            [ case app.runningIds of
+                                Nothing ->
+                                    H.div
+                                        [ HE.onClick (IconClicked { app | justClicked = Just "" } Nothing)
+                                        , HA.classList
+                                            [ ( "icon-container", True )
+                                            , ( "bounce", Maybe.isJust app.justClicked )
+                                            ]
+                                        ]
+                                        [ H.img
+                                            [ HA.class "icon"
+                                            , HA.width 64
+                                            , HA.height 64
+                                            , HA.src app.iconPath
+                                            , HA.title app.name
+                                            ]
+                                            []
+                                        ]
+
+                                Just runningIds ->
+                                    (if model.hoveredClass == Just app.wmClass then
+                                        runningIds
+
+                                     else
+                                        runningIds |> List.take 1
+                                    )
+                                        |> (\runningIds_ ->
+                                                flexRow [ HA.css [ Css.justifyContent Css.center, Css.marginRight (Css.px 16) ] ]
+                                                    (runningIds_
+                                                        |> List.map
+                                                            (\runningId ->
+                                                                H.div
+                                                                    [ HE.onClick (IconClicked { app | justClicked = Just runningId } (Just runningId))
+                                                                    , HA.classList
+                                                                        [ ( "icon-container", True )
+                                                                        , ( "running", True )
+                                                                        , ( "bounce", app.justClicked == Just runningId )
+                                                                        ]
+                                                                    ]
+                                                                    [ H.img
+                                                                        [ HA.class "icon"
+                                                                        , HA.width 64
+                                                                        , HA.height 64
+                                                                        , HA.src app.iconPath
+                                                                        , HA.title app.name
+                                                                        ]
+                                                                        []
+                                                                    ]
+                                                            )
+                                                    )
+                                           )
                             ]
                     )
             )
@@ -182,7 +254,10 @@ subscriptions _ =
 -- PORTS
 
 
+port mouseAppLeft : () -> Cmd msg
+
+
 port iconClicked : ( Maybe String, String ) -> Cmd msg
 
 
-port runningAppsReceived : (List ( String, String ) -> msg) -> Sub msg
+port runningAppsReceived : (List ( String, List String ) -> msg) -> Sub msg

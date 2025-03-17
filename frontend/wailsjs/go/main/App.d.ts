@@ -9,3 +9,5 @@ export function GetDesktopFiles():Promise<Array<main.AppInfo>>;
 export function StartTicker():Promise<void>;
 
 export function TrackMouse():Promise<void>;
+
+export function WindowHide():Promise<void>;

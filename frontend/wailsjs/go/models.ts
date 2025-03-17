@@ -3,7 +3,7 @@ export namespace main {
 	export class AppInfo {
 	    name: string;
 	    iconPath: string;
-	    runningId: string;
+	    runningIds: string[];
 	    execPath: string;
 	    wmClass: string;
 	
@@ -15,7 +15,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.iconPath = source["iconPath"];
-	        this.runningId = source["runningId"];
+	        this.runningIds = source["runningIds"];
 	        this.execPath = source["execPath"];
 	        this.wmClass = source["wmClass"];
 	    }

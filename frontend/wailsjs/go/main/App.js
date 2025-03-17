@@ -17,3 +17,7 @@ export function StartTicker() {
 export function TrackMouse() {
   return window['go']['main']['App']['TrackMouse']();
 }
+
+export function WindowHide() {
+  return window['go']['main']['App']['WindowHide']();
+}

@@ -20,11 +20,11 @@ type App struct {
 }
 
 type AppInfo struct {
-	Name      string `json:"name"`
-	IconPath  string `json:"iconPath"`
-	RunningId string `json:"runningId"`
-	ExecPath  string `json:"execPath"`
-	WmClass   string `json:"wmClass"`
+	Name       string   `json:"name"`
+	IconPath   string   `json:"iconPath"`
+	RunningIds []string `json:"runningIds"`
+	ExecPath   string   `json:"execPath"`
+	WmClass    string   `json:"wmClass"`
 }
 
 // NewApp creates a new App application struct
@@ -42,7 +42,7 @@ func (a *App) GetDesktopFiles() []AppInfo {
 	for _, file := range desktopFiles {
 		name, icon, exec, wmClass := parseDesktopFile(file)
 		runningId, _ := runningApps[strings.ToLower(name)]
-		apps = append(apps, AppInfo{Name: name, IconPath: icon, RunningId: runningId, ExecPath: exec, WmClass: wmClass})
+		apps = append(apps, AppInfo{Name: name, IconPath: icon, RunningIds: runningId, ExecPath: exec, WmClass: wmClass})
 	}
 
 	return apps
@@ -84,13 +84,15 @@ func (a *App) TrackMouse() {
 			// Show the dock when the mouse is within the middle of the Y-axis
 			if x <= 5 && y >= middleMin && y <= middleMax {
 				runtime.WindowShow(a.ctx)
-				runtime.WindowShow(a.ctx)
-			} else if x >= 100 {
-				runtime.WindowHide(a.ctx)
+				a.setSizeAndPosition()
 			}
 			time.Sleep(100 * time.Millisecond) // Polling rate
 		}
 	}()
+}
+
+func (a *App) WindowHide() {
+	runtime.WindowHide(a.ctx)
 }
 
 var previousId string
@@ -113,7 +115,7 @@ func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 	return err
 }
 
-func (a *App) getRunningApps() map[string]string {
+func (a *App) getRunningApps() map[string][]string {
 	// Run the wmctrl command to list windows
 	cmd := exec.Command("wmctrl", "-lx")
 	output, err := cmd.Output()
@@ -123,7 +125,7 @@ func (a *App) getRunningApps() map[string]string {
 
 	// Parse the output into application names
 	lines := strings.Split(string(output), "\n")
-	apps := make(map[string]string)
+	apps := make(map[string][]string)
 
 	for _, line := range lines {
 		parts := strings.Fields(line)
@@ -138,8 +140,10 @@ func (a *App) getRunningApps() map[string]string {
 
 		// Extract the application class from the third column
 		appClass := strings.Split(parts[2], ".")[0] // Get only the class name, ignoring the instance
-		apps[appClass] = parts[0]
+		windowID := parts[0]
 
+		// Append the window ID to the list of window IDs for this app class
+		apps[appClass] = append(apps[appClass], windowID)
 	}
 
 	return apps
@@ -153,19 +157,17 @@ func (a *App) StartTicker() {
 	go func() {
 		// Periodically send updates to the frontend
 		for range ticker.C {
-			// Do some processing (e.g., checking system stats, data, etc.)
-
-			// Send result to the frontend (use runtime.SendToFrontend)
-			var runningApps [][]string
-			for key, value := range a.getRunningApps() {
-				runningApps = append(runningApps, []string{key, value})
-			}
-
-			runtime.EventsEmit(a.ctx, "update", runningApps)
-
+			runtime.EventsEmit(a.ctx, "update", a.getRunningApps())
 		}
 	}()
 
+}
+
+func (a *App) setSizeAndPosition() {
+	apps := a.GetDesktopFiles()
+	_, height := robotgo.GetScreenSize()
+	runtime.WindowSetPosition(a.ctx, -5, height/2-(len(apps)*40))
+	runtime.WindowSetSize(a.ctx, 85, len(apps)*74)
 }
 
 // startup is called when the app starts. The context is saved
@@ -179,11 +181,7 @@ func (a *App) startup(ctx context.Context) {
 
 // domReady is called after front-end resources have been loaded
 func (a *App) domReady(ctx context.Context) {
-
-	apps := a.GetDesktopFiles()
-	_, height := robotgo.GetScreenSize()
-	runtime.WindowSetPosition(ctx, -5, height/2-(len(apps)*40))
-	runtime.WindowSetSize(ctx, 85, len(apps)*74)
+	a.setSizeAndPosition()
 	a.StartTicker()
 }
 
