@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/go-vgo/robotgo"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -143,10 +144,9 @@ func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 
 func (a *App) getRunningInstances() map[string][]WmCtrlInstance {
 	// Run the wmctrl command to list windows
-	cmd := exec.Command("wmctrl", "-lx")
-	output, err := cmd.Output()
+	output, err := exec.Command("wmctrl", "-lx").Output()
 	if err != nil {
-		log.Fatal("Failed to execute wmctrl:", err)
+		logrus.Error("Failed to execute wmctrl:", err)
 	}
 
 	// Parse the output into application names
