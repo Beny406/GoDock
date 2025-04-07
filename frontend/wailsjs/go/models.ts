@@ -14,7 +14,7 @@ export namespace main {
 	        this.name = source["name"];
 	    }
 	}
-	export class DesktopFile {
+	export class DesktopFileForFE {
 	    name: string;
 	    iconPath: string;
 	    instances: WmCtrlInstance[];
@@ -22,7 +22,7 @@ export namespace main {
 	    wmClass: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new DesktopFile(source);
+	        return new DesktopFileForFE(source);
 	    }
 	
 	    constructor(source: any = {}) {

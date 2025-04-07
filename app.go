@@ -20,12 +20,19 @@ type App struct {
 	ticker *time.Ticker
 }
 
-type DesktopFile struct {
+type DesktopFileForFE struct {
 	Name      string           `json:"name"`
 	IconPath  string           `json:"iconPath"`
-	Instances []WmCtrlInstance `json:"instances,omitempty"`
-	ExecPath  string           `json:"exec"`
+	Instances []WmCtrlInstance `json:"instances"`
+	ExecPath  string           `json:"execPath"`
 	WmClass   string           `json:"wmClass"`
+}
+
+type DesktopFile struct {
+	Name     string `json:"name"`
+	IconPath string `json:"iconPath"`
+	ExecPath string `json:"execPath"`
+	WmClass  string `json:"wmClass"`
 }
 
 type WmCtrlApp struct {
@@ -38,12 +45,22 @@ type WmCtrlInstance struct {
 	Name     string `json:"name"`
 }
 
+func MapToDesktopFileForFE(df DesktopFile, instances []WmCtrlInstance) DesktopFileForFE {
+	return DesktopFileForFE{
+		Name:      df.Name,
+		IconPath:  df.IconPath,
+		ExecPath:  df.ExecPath,
+		WmClass:   df.WmClass,
+		Instances: instances,
+	}
+}
+
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
 }
 
-func (a *App) GetDesktopFiles() []DesktopFile {
+func (a *App) GetDesktopFiles() []DesktopFileForFE {
 	classToInstancesMap := a.getRunningInstances()
 
 	file, err := os.ReadFile("/home/petr/GoDock/apps.json")
@@ -58,12 +75,14 @@ func (a *App) GetDesktopFiles() []DesktopFile {
 		return nil
 	}
 
+	appsForFE := make([]DesktopFileForFE, len(apps))
 	for i, app := range apps {
 		instances, _ := classToInstancesMap[strings.ToLower(app.Name)]
-		apps[i].Instances = instances
+		appsForFE[i] = MapToDesktopFileForFE(app, instances)
+		appsForFE[i].Instances = instances
 	}
 
-	return apps
+	return appsForFE
 }
 
 func (a *App) TrackMouse() {
@@ -96,11 +115,18 @@ var previousId string
 
 func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 	if runningId == "" {
-		return exec.Command("sh", "-c", execPath).Start()
+		err := exec.Command("sh", "-c", execPath).Start()
+		if err != nil {
+			logrus.Error("Failed to execute command:", err)
+		}
+		return err
 	}
 
 	if previousId == runningId {
 		err := exec.Command("xdotool", "windowminimize", runningId).Run()
+		if err != nil {
+			logrus.Error("Failed to minimize window:", err)
+		}
 		previousId = ""
 		return err
 	}
@@ -108,6 +134,8 @@ func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 	err := exec.Command("wmctrl", "-ia", runningId).Run()
 	if err == nil {
 		previousId = runningId
+	} else {
+		logrus.Error("Failed to bring window to front:", err)
 	}
 	return err
 }
@@ -184,6 +212,7 @@ func (a *App) setSizeAndPosition() {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	logrus.Info("Starting Wails app")
 	runtime.WindowSetAlwaysOnTop(ctx, true) // Keep the window on top
 	a.TrackMouse()                          // Start tracking mouse globally
 
@@ -192,6 +221,7 @@ func (a *App) startup(ctx context.Context) {
 // domReady is called after front-end resources have been loaded
 func (a *App) domReady(ctx context.Context) {
 	a.setSizeAndPosition()
+	logrus.Info("DOM is ready")
 	a.StartTicker()
 }
 
@@ -199,11 +229,13 @@ func (a *App) domReady(ctx context.Context) {
 // either by clicking the window close button or calling runtime.Quit.
 // Returning true will cause the application to continue, false will continue shutdown as normal.
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
+	logrus.Info("Before close")
 	return false
 }
 
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
+	logrus.Info("Shutting down Wails app")
 	a.ticker.Stop()
 	// Perform your teardown here
 }

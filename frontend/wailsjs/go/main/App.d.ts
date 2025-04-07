@@ -4,7 +4,7 @@ import {main} from '../models';
 
 export function BringToFrontOrLaunch(arg1:string,arg2:string):Promise<void>;
 
-export function GetDesktopFiles():Promise<Array<main.DesktopFile>>;
+export function GetDesktopFiles():Promise<Array<main.DesktopFileForFE>>;
 
 export function StartTicker():Promise<void>;
 
