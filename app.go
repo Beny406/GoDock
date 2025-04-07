@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -25,8 +23,8 @@ type App struct {
 type DesktopFile struct {
 	Name      string           `json:"name"`
 	IconPath  string           `json:"iconPath"`
-	Instances []WmCtrlInstance `json:"instances"`
-	ExecPath  string           `json:"execPath"`
+	Instances []WmCtrlInstance `json:"instances,omitempty"`
+	ExecPath  string           `json:"exec"`
 	WmClass   string           `json:"wmClass"`
 }
 
@@ -47,53 +45,25 @@ func NewApp() *App {
 
 func (a *App) GetDesktopFiles() []DesktopFile {
 	classToInstancesMap := a.getRunningInstances()
-	apps := []DesktopFile{}
 
-	// Get .desktop files from /usr/share/applications
-	desktopFiles, _ := filepath.Glob("/home/petr/GoDock/*.desktop")
-	sort.Slice(desktopFiles, func(i, j int) bool {
-		filename1 := filepath.Base(desktopFiles[i]) // "7_xpad.desktop"
-		filename2 := filepath.Base(desktopFiles[j]) // "7_xpad.desktop"
+	file, err := os.ReadFile("/home/petr/GoDock/apps.json")
+	if err != nil {
+		logrus.Error("Error reading apps.json: %v", err)
+		return nil
+	}
 
-		// Split by underscore to get the number part
+	var apps []DesktopFile
+	if err := json.Unmarshal(file, &apps); err != nil {
+		logrus.Error("Error parsing apps.json: %v", err)
+		return nil
+	}
 
-		int1, _ := strconv.Atoi(strings.Split(filename1, "_")[0])
-		int2, _ := strconv.Atoi(strings.Split(filename2, "_")[0])
-
-		return int1 < int2
-	})
-
-	for _, file := range desktopFiles {
-		name, icon, exec, wmClass := parseDesktopFile(file)
-		instances, _ := classToInstancesMap[strings.ToLower(name)]
-		apps = append(apps, DesktopFile{Name: name, IconPath: icon, Instances: instances, ExecPath: exec, WmClass: wmClass})
+	for i, app := range apps {
+		instances, _ := classToInstancesMap[strings.ToLower(app.Name)]
+		apps[i].Instances = instances
 	}
 
 	return apps
-}
-
-func parseDesktopFile(filePath string) (string, string, string, string) {
-	file, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", "", "", ""
-	}
-
-	var name, icon, exec, wmClass string
-	lines := strings.Split(string(file), "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "Name=") {
-			name = strings.TrimPrefix(line, "Name=")
-		} else if strings.HasPrefix(line, "Icon=") {
-			icon = strings.TrimPrefix(line, "Icon=")
-		} else if strings.HasPrefix(line, "Exec=") {
-			exec = strings.TrimPrefix(line, "Exec=")
-		} else if strings.HasPrefix(line, "StartupWMClass=") {
-			wmClass = strings.TrimPrefix(line, "StartupWMClass=")
-		}
-
-	}
-
-	return name, icon, exec, wmClass
 }
 
 func (a *App) TrackMouse() {
