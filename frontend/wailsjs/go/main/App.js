@@ -10,14 +10,6 @@ export function GetDesktopFiles() {
   return window['go']['main']['App']['GetDesktopFiles']();
 }
 
-export function StartTicker() {
-  return window['go']['main']['App']['StartTicker']();
-}
-
-export function TrackMouse() {
-  return window['go']['main']['App']['TrackMouse']();
-}
-
 export function WindowHide() {
   return window['go']['main']['App']['WindowHide']();
 }

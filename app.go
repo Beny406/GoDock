@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -45,16 +47,6 @@ type WmCtrlInstance struct {
 	Name     string `json:"name"`
 }
 
-func MapToDesktopFileForFE(df DesktopFile, instances []WmCtrlInstance) DesktopFileForFE {
-	return DesktopFileForFE{
-		Name:      df.Name,
-		IconPath:  df.IconPath,
-		ExecPath:  df.ExecPath,
-		WmClass:   df.WmClass,
-		Instances: instances,
-	}
-}
-
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
@@ -78,30 +70,16 @@ func (a *App) GetDesktopFiles() []DesktopFileForFE {
 	appsForFE := make([]DesktopFileForFE, len(apps))
 	for i, app := range apps {
 		instances, _ := classToInstancesMap[strings.ToLower(app.Name)]
-		appsForFE[i] = MapToDesktopFileForFE(app, instances)
-		appsForFE[i].Instances = instances
+		appsForFE[i] = DesktopFileForFE{
+			Name:      app.Name,
+			IconPath:  app.IconPath,
+			ExecPath:  app.ExecPath,
+			WmClass:   app.WmClass,
+			Instances: instances,
+		}
 	}
 
 	return appsForFE
-}
-
-func (a *App) TrackMouse() {
-	go func() {
-		for {
-			_, height := robotgo.GetScreenSize()
-			x, y := robotgo.Location()
-			// Define the middle of the screen (e.g., between 1/3 and 2/3 of the screen height)
-			middleMin := height / 4
-			middleMax := 3 * height / 4
-
-			// Show the dock when the mouse is within the middle of the Y-axis
-			if x <= 5 && y >= middleMin && y <= middleMax {
-				runtime.WindowShow(a.ctx)
-				a.setSizeAndPosition()
-			}
-			time.Sleep(100 * time.Millisecond) // Polling rate
-		}
-	}()
 }
 
 func (a *App) WindowHide() {
@@ -115,7 +93,15 @@ var previousId string
 
 func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 	if runningId == "" {
-		err := exec.Command("sh", "-c", execPath).Start()
+		cmd := exec.Command("sh", "-c", execPath)
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		cmd.Stdin = nil
+		// start as a separate process so it doesnt crash when dock crashes
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+		}
+		err := cmd.Start()
 		if err != nil {
 			logrus.Error("Failed to execute command:", err)
 		}
@@ -140,9 +126,40 @@ func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
 	return err
 }
 
+func (a *App) trackMouse() {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Error("trackMouse panic:", r)
+			}
+		}()
+
+		for {
+			_, height := robotgo.GetScreenSize()
+			x, y := robotgo.Location()
+			// Define the middle of the screen (e.g., between 1/3 and 2/3 of the screen height)
+			middleMin := height / 4
+			middleMax := 3 * height / 4
+
+			// Show the dock when the mouse is within the middle of the Y-axis
+			if x <= 5 && y >= middleMin && y <= middleMax {
+				runtime.WindowShow(a.ctx)
+				a.setSizeAndPosition()
+			}
+			time.Sleep(100 * time.Millisecond) // Polling rate
+		}
+	}()
+}
+
 func (a *App) getRunningInstances() map[string][]WmCtrlInstance {
-	// Run the wmctrl command to list windows
-	output, err := exec.Command("wmctrl", "-lx").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	output, err := exec.CommandContext(ctx, "wmctrl", "-lx").Output()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		logrus.Warn("wmctrl command timed out")
+		return nil
+	}
 	if err != nil {
 		logrus.Error("Failed to execute wmctrl:", err)
 	}
@@ -177,10 +194,16 @@ func (a *App) getRunningInstances() map[string][]WmCtrlInstance {
 	return apps
 }
 
-func (a *App) StartTicker() {
+func (a *App) startTicker() {
 	// Create a new ticker that ticks every 1 second
 	ticker := time.NewTicker(1 * time.Second)
 	a.ticker = ticker
+
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Error("startTicker panic:", r)
+		}
+	}()
 
 	go func() {
 		// Periodically send updates to the frontend
@@ -214,7 +237,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	logrus.Info("Starting Wails app")
 	runtime.WindowSetAlwaysOnTop(ctx, true) // Keep the window on top
-	a.TrackMouse()                          // Start tracking mouse globally
+	a.trackMouse()                          // Start tracking mouse globally
 
 }
 
@@ -222,7 +245,7 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) domReady(ctx context.Context) {
 	a.setSizeAndPosition()
 	logrus.Info("DOM is ready")
-	a.StartTicker()
+	a.startTicker()
 }
 
 // beforeClose is called when the application is about to quit,
