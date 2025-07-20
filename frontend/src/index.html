@@ -17,7 +17,7 @@
 <script>
     (function () {
 
-        window.go.main.App.GetDesktopFiles().then(apps => {
+        window.go.main.App.GetDesktopFilesForFE().then(apps => {
             const app = Elm.Main.init({node: document.getElementById("elm"), flags: {apps: apps}});
 
             app.ports.mouseAppLeft.subscribe(function (params) {
@@ -27,7 +27,7 @@
 
             app.ports.iconClicked.subscribe(function (params) {
                 const [runningId, execPath] = params;
-                window.go.main.App.BringToFrontOrLaunch(runningId, execPath)
+                window.go.main.App.OnIconClick(runningId, execPath)
                     .then(result => console.log(result));
             });
 

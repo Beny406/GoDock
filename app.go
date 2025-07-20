@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -18,8 +17,11 @@ import (
 
 // App struct
 type App struct {
-	ctx    context.Context
-	ticker *time.Ticker
+	ctx          context.Context
+	ticker       *time.Ticker
+	desktopFiles []DesktopFile
+	screenWidth  int
+	screenHeight int
 }
 
 type DesktopFileForFE struct {
@@ -52,78 +54,54 @@ func NewApp() *App {
 	return &App{}
 }
 
-func (a *App) GetDesktopFiles() []DesktopFileForFE {
-	classToInstancesMap := a.getRunningInstances()
+// startup is called when the app starts. The context is saved
+// so we can call the runtime methods
+func (a *App) startup(ctx context.Context) {
+	logrus.Info("Starting Wails app")
+	a.ctx = ctx
+	a.screenWidth, a.screenHeight = robotgo.GetScreenSize()
+	logrus.Infof("Screen size: %dx%d", a.screenWidth, a.screenHeight)
+	a.desktopFiles = a.getDesktopFiles()
+	logrus.Infof("Loaded %d desktop files", len(a.desktopFiles))
+	runtime.WindowSetAlwaysOnTop(ctx, true) // Keep the window on top
+	a.trackMouse()                          // Start tracking mouse globally
+	a.startTicker()
 
+}
+
+// domReady is called after front-end resources have been loaded
+func (a *App) domReady(ctx context.Context) {
+	logrus.Info("DOM is ready")
+}
+
+// beforeClose is called when the application is about to quit,
+// either by clicking the window close button or calling runtime.Quit.
+// Returning true will cause the application to continue, false will continue shutdown as normal.
+func (a *App) beforeClose(ctx context.Context) (prevent bool) {
+	logrus.Info("Before close")
+	return false
+}
+
+// shutdown is called at application termination
+func (a *App) shutdown(ctx context.Context) {
+	logrus.Info("Shutting down Wails app")
+	a.ticker.Stop()
+	// Perform your teardown here
+}
+
+func (a *App) getDesktopFiles() []DesktopFile {
 	file, err := os.ReadFile("/home/petr/GoDock/apps.json")
 	if err != nil {
 		logrus.Error("Error reading apps.json: %v", err)
 		return nil
 	}
 
-	var apps []DesktopFile
-	if err := json.Unmarshal(file, &apps); err != nil {
+	var desktopFiles []DesktopFile
+	if err := json.Unmarshal(file, &desktopFiles); err != nil {
 		logrus.Error("Error parsing apps.json: %v", err)
 		return nil
 	}
-
-	appsForFE := make([]DesktopFileForFE, len(apps))
-	for i, app := range apps {
-		instances, _ := classToInstancesMap[strings.ToLower(app.Name)]
-		appsForFE[i] = DesktopFileForFE{
-			Name:      app.Name,
-			IconPath:  app.IconPath,
-			ExecPath:  app.ExecPath,
-			WmClass:   app.WmClass,
-			Instances: instances,
-		}
-	}
-
-	return appsForFE
-}
-
-func (a *App) WindowHide() {
-	x, _ := robotgo.Location()
-	if x > 5 {
-		runtime.WindowHide(a.ctx)
-	}
-}
-
-var previousId string
-
-func (a *App) BringToFrontOrLaunch(runningId string, execPath string) error {
-	if runningId == "" {
-		cmd := exec.Command("sh", "-c", execPath)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		cmd.Stdin = nil
-		// start as a separate process so it doesnt crash when dock crashes
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
-		}
-		err := cmd.Start()
-		if err != nil {
-			logrus.Error("Failed to execute command:", err)
-		}
-		return err
-	}
-
-	if previousId == runningId {
-		err := exec.Command("xdotool", "windowminimize", runningId).Run()
-		if err != nil {
-			logrus.Error("Failed to minimize window:", err)
-		}
-		previousId = ""
-		return err
-	}
-
-	err := exec.Command("wmctrl", "-ia", runningId).Run()
-	if err == nil {
-		previousId = runningId
-	} else {
-		logrus.Error("Failed to bring window to front:", err)
-	}
-	return err
+	return desktopFiles
 }
 
 func (a *App) trackMouse() {
@@ -135,11 +113,11 @@ func (a *App) trackMouse() {
 		}()
 
 		for {
-			_, height := robotgo.GetScreenSize()
+			logrus.Info("TrackMouse")
 			x, y := robotgo.Location()
 			// Define the middle of the screen (e.g., between 1/3 and 2/3 of the screen height)
-			middleMin := height / 4
-			middleMax := 3 * height / 4
+			middleMin := a.screenHeight / 4
+			middleMax := 3 * a.screenHeight / 4
 
 			// Show the dock when the mouse is within the middle of the Y-axis
 			if x <= 5 && y >= middleMin && y <= middleMax {
@@ -147,6 +125,36 @@ func (a *App) trackMouse() {
 				a.setSizeAndPosition()
 			}
 			time.Sleep(100 * time.Millisecond) // Polling rate
+		}
+	}()
+}
+
+func (a *App) startTicker() {
+	// Create a new ticker that ticks every 1 second
+	ticker := time.NewTicker(1 * time.Second)
+	a.ticker = ticker
+
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Error("startTicker panic:", r)
+		}
+	}()
+
+	go func() {
+		// Periodically send updates to the frontend
+		for range ticker.C {
+			logrus.Info("startTicker tick")
+			var apps []WmCtrlApp
+			for wmClass, instances := range a.getRunningInstances() {
+				apps = append(apps,
+					WmCtrlApp{
+						WmClass:   wmClass,
+						Instances: instances,
+					})
+
+			}
+
+			runtime.EventsEmit(a.ctx, "update", apps)
 		}
 	}()
 }
@@ -194,71 +202,11 @@ func (a *App) getRunningInstances() map[string][]WmCtrlInstance {
 	return apps
 }
 
-func (a *App) startTicker() {
-	// Create a new ticker that ticks every 1 second
-	ticker := time.NewTicker(1 * time.Second)
-	a.ticker = ticker
-
-	defer func() {
-		if r := recover(); r != nil {
-			logrus.Error("startTicker panic:", r)
-		}
-	}()
-
-	go func() {
-		// Periodically send updates to the frontend
-		for range ticker.C {
-			var apps []WmCtrlApp
-			for wmClass, instances := range a.getRunningInstances() {
-				apps = append(apps,
-					WmCtrlApp{
-						WmClass:   wmClass,
-						Instances: instances,
-					})
-
-			}
-
-			runtime.EventsEmit(a.ctx, "update", apps)
-		}
-	}()
-
-}
-
 func (a *App) setSizeAndPosition() {
-	apps := a.GetDesktopFiles()
-	_, height := robotgo.GetScreenSize()
-	runtime.WindowSetPosition(a.ctx, 0, height/2-(len(apps)*40))
-	runtime.WindowSetSize(a.ctx, 85, len(apps)*74)
-}
+	yPosition := a.screenHeight/2 - (len(a.desktopFiles) * 40)
+	windowsHeight := len(a.desktopFiles) * 74
+	logrus.Infof("Setting dock position to y: %d, height: %d", yPosition, windowsHeight)
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
-	logrus.Info("Starting Wails app")
-	runtime.WindowSetAlwaysOnTop(ctx, true) // Keep the window on top
-	a.trackMouse()                          // Start tracking mouse globally
-
-}
-
-// domReady is called after front-end resources have been loaded
-func (a *App) domReady(ctx context.Context) {
-	a.setSizeAndPosition()
-	logrus.Info("DOM is ready")
-	a.startTicker()
-}
-
-// beforeClose is called when the application is about to quit,
-// either by clicking the window close button or calling runtime.Quit.
-// Returning true will cause the application to continue, false will continue shutdown as normal.
-func (a *App) beforeClose(ctx context.Context) (prevent bool) {
-	logrus.Info("Before close")
-	return false
-}
-
-// shutdown is called at application termination
-func (a *App) shutdown(ctx context.Context) {
-	logrus.Info("Shutting down Wails app")
-	a.ticker.Stop()
-	// Perform your teardown here
+	runtime.WindowSetPosition(a.ctx, 0, yPosition)
+	runtime.WindowSetSize(a.ctx, 85, windowsHeight)
 }
