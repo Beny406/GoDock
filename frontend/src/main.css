@@ -98,14 +98,14 @@ body {
 .icon-container.running::before {
   content: "";
   position: absolute;
-  left: -6px;  /* Slightly tucked in */
+  left: -6px;
   top: 50%;
   transform: translateY(-50%);
   width: 6px;
   height: 6px;
-  background-color: rgba(30, 144, 255, 0.6); /* Soft blue with some transparency */
+  background-color: rgba(30, 144, 255, 0.6);
   border-radius: 50%;
-  box-shadow: 0 0 2px rgba(30, 144, 255, 0.4); /* Gentle glow */
+  box-shadow: 0 0 2px rgba(30, 144, 255, 0.4);
 }
 
 @keyframes bounce {
