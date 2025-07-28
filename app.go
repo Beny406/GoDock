@@ -15,6 +15,18 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// #cgo LDFLAGS: -lX11
+// #include <X11/Xlib.h>
+//
+// void initXThreads() {
+//     XInitThreads();
+// }
+import "C"
+
+func init() {
+	C.initXThreads()
+}
+
 // App struct
 type App struct {
 	ctx          context.Context
@@ -113,7 +125,6 @@ func (a *App) trackMouse() {
 		}()
 
 		for {
-			logrus.Info("TrackMouse")
 			x, y := robotgo.Location()
 			// Define the middle of the screen (e.g., between 1/3 and 2/3 of the screen height)
 			middleMin := a.screenHeight / 4
@@ -143,7 +154,6 @@ func (a *App) startTicker() {
 	go func() {
 		// Periodically send updates to the frontend
 		for range ticker.C {
-			logrus.Info("startTicker tick")
 			var apps []WmCtrlApp
 			for wmClass, instances := range a.getRunningInstances() {
 				apps = append(apps,

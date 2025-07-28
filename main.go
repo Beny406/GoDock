@@ -43,7 +43,7 @@ func main() {
 			Assets:  assets,
 			Handler: NewFileLoader(),
 		}, Menu: nil,
-		Logger:           nil,
+		Logger:           logger.NewDefaultLogger(),
 		LogLevel:         logger.DEBUG,
 		OnStartup:        app.startup,
 		OnDomReady:       app.domReady,
