@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -35,6 +32,7 @@ type App struct {
 	screenWidth   int
 	screenHeight  int
 	windowVisible bool
+	x11           *X11Client
 }
 
 type DesktopFileForFE struct {
@@ -72,14 +70,20 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	logrus.Info("Starting Wails app")
 	a.ctx = ctx
+
+	var err error
+	a.x11, err = NewX11Client()
+	if err != nil {
+		logrus.Fatalf("Failed to connect to X11: %v", err)
+	}
+
 	a.screenWidth, a.screenHeight = robotgo.GetScreenSize()
 	logrus.Infof("Screen size: %dx%d", a.screenWidth, a.screenHeight)
 	a.desktopFiles = a.getDesktopFiles()
 	logrus.Infof("Loaded %d desktop files", len(a.desktopFiles))
-	runtime.WindowSetAlwaysOnTop(ctx, true) // Keep the window on top
-	a.trackMouse()                          // Start tracking mouse globally
+	runtime.WindowSetAlwaysOnTop(ctx, true)
+	a.trackMouse()
 	a.startTicker()
-
 }
 
 // domReady is called after front-end resources have been loaded
@@ -99,7 +103,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 func (a *App) shutdown(ctx context.Context) {
 	logrus.Info("Shutting down Wails app")
 	a.ticker.Stop()
-	// Perform your teardown here
+	if a.x11 != nil {
+		a.x11.Close()
+	}
 }
 
 func (a *App) getDesktopFiles() []DesktopFile {
@@ -174,46 +180,7 @@ func (a *App) startTicker() {
 }
 
 func (a *App) getRunningInstances() map[string][]WmCtrlInstance {
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
-
-	output, err := exec.CommandContext(ctx, "wmctrl", "-lx").Output()
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		logrus.Warn("wmctrl command timed out")
-		return nil
-	}
-	if err != nil {
-		logrus.Error("Failed to execute wmctrl:", err)
-	}
-
-	// Parse the output into application names
-	lines := strings.Split(string(output), "\n")
-	apps := make(map[string][]WmCtrlInstance)
-
-	for _, line := range lines {
-		parts := strings.Fields(line)
-		if len(parts) < 4 {
-			continue // Skip malformed lines
-		}
-
-		// Check if the second column is "-1" (invisible desktops)
-		if parts[1] == "-1" {
-			continue
-		}
-
-		// Extract the application class from the third column
-		appClass := strings.Split(parts[2], ".")[0] // Get only the class name, ignoring the instance
-		windowID := parts[0]
-
-		// Append the window ID to the list of window IDs for this app class
-		instance := WmCtrlInstance{
-			WindowId: windowID,
-			Name:     strings.Join(parts[4:], " "),
-		}
-		apps[appClass] = append(apps[appClass], instance)
-	}
-
-	return apps
+	return a.x11.ListWindows()
 }
 
 func (a *App) setSizeAndPosition() {

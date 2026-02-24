@@ -47,7 +47,7 @@ func (a *App) OnIconClick(runningId string, execPath string) error {
 	}
 
 	if previousId == runningId {
-		err := exec.Command("xdotool", "windowminimize", runningId).Run()
+		err := a.x11.MinimizeWindow(runningId)
 		if err != nil {
 			logrus.Error("Failed to minimize window:", err)
 		}
@@ -55,7 +55,7 @@ func (a *App) OnIconClick(runningId string, execPath string) error {
 		return err
 	}
 
-	err := exec.Command("wmctrl", "-ia", runningId).Run()
+	err := a.x11.FocusWindow(runningId)
 	if err == nil {
 		previousId = runningId
 	} else {

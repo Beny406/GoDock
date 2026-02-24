@@ -6,6 +6,7 @@ toolchain go1.23.7
 
 require (
 	github.com/go-vgo/robotgo v0.110.6
+	github.com/jezek/xgb v1.1.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/wailsapp/wails/v2 v2.10.1
 )
@@ -19,7 +20,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
-	github.com/jezek/xgb v1.1.1 // indirect
 	github.com/kbinani/screenshot v0.0.0-20250118074034-a3924b7bbc8c // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
