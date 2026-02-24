@@ -29,11 +29,12 @@ func init() {
 
 // App struct
 type App struct {
-	ctx          context.Context
-	ticker       *time.Ticker
-	desktopFiles []DesktopFile
-	screenWidth  int
-	screenHeight int
+	ctx           context.Context
+	ticker        *time.Ticker
+	desktopFiles  []DesktopFile
+	screenWidth   int
+	screenHeight  int
+	windowVisible bool
 }
 
 type DesktopFileForFE struct {
@@ -132,8 +133,11 @@ func (a *App) trackMouse() {
 
 			// Show the dock when the mouse is within the middle of the Y-axis
 			if x <= 5 && y >= middleMin && y <= middleMax {
-				runtime.WindowShow(a.ctx)
-				a.setSizeAndPosition()
+				if !a.windowVisible {
+					a.windowVisible = true
+					runtime.WindowShow(a.ctx)
+					a.setSizeAndPosition()
+				}
 			}
 			time.Sleep(100 * time.Millisecond) // Polling rate
 		}

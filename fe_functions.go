@@ -67,6 +67,7 @@ func (a *App) OnIconClick(runningId string, execPath string) error {
 func (a *App) WindowHide() {
 	x, _ := robotgo.Location()
 	if x > 5 {
+		a.windowVisible = false
 		runtime.WindowHide(a.ctx)
 	}
 }
