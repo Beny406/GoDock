@@ -27,8 +27,6 @@ func (a *App) GetDesktopFilesForFE() []DesktopFileForFE {
 	return appsForFE
 }
 
-var previousId string
-
 func (a *App) OnIconClick(runningId string, execPath string) error {
 	if runningId == "" {
 		cmd := exec.Command("sh", "-c", execPath)
@@ -46,18 +44,18 @@ func (a *App) OnIconClick(runningId string, execPath string) error {
 		return err
 	}
 
-	if previousId == runningId {
+	if a.previousId == runningId {
 		err := a.x11.MinimizeWindow(runningId)
 		if err != nil {
 			logrus.Error("Failed to minimize window:", err)
 		}
-		previousId = ""
+		a.previousId = ""
 		return err
 	}
 
 	err := a.x11.FocusWindow(runningId)
 	if err == nil {
-		previousId = runningId
+		a.previousId = runningId
 	} else {
 		logrus.Error("Failed to bring window to front:", err)
 	}

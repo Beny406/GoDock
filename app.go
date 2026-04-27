@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -33,6 +34,7 @@ type App struct {
 	screenHeight  int
 	windowVisible bool
 	x11           *X11Client
+	previousId    string
 }
 
 type DesktopFileForFE struct {
@@ -109,15 +111,22 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 func (a *App) getDesktopFiles() []DesktopFile {
-	file, err := os.ReadFile("/home/petr/GoDock/apps.json")
+	home, err := os.UserHomeDir()
 	if err != nil {
-		logrus.Error("Error reading apps.json: %v", err)
+		logrus.Errorf("Failed to get home directory: %v", err)
+		return nil
+	}
+	path := filepath.Join(home, "GoDock", "apps.json")
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		logrus.Errorf("Error reading apps.json: %v", err)
 		return nil
 	}
 
 	var desktopFiles []DesktopFile
 	if err := json.Unmarshal(file, &desktopFiles); err != nil {
-		logrus.Error("Error parsing apps.json: %v", err)
+		logrus.Errorf("Error parsing apps.json: %v", err)
 		return nil
 	}
 	return desktopFiles

@@ -1,2 +1,5 @@
 elm-stuff
 /.vscode
+/.idea
+/build/bin
+notes.txt
